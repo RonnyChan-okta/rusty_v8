@@ -109,7 +109,12 @@ extern "C" {
     this: *const Value,
     isolate: *mut Isolate,
   ) -> *const Boolean;
-
+  fn v8__Value__InstanceOf(
+    this: *const Value,
+    context: *const Context,
+    object: *const Object,
+    out: *mut Maybe<bool>,
+  );
   fn v8__Value__NumberValue(
     this: *const Value,
     context: *const Context,
@@ -549,6 +554,23 @@ impl Value {
       scope.cast_local(|sd| v8__Value__ToBoolean(self, sd.get_isolate_ptr()))
     }
     .unwrap()
+  }
+
+  pub fn instance_of<'s>(
+    &self,
+    scope: &mut HandleScope<'s>,
+    object: Local<Object>,
+  ) -> Option<bool> {
+    let mut out = Maybe::<bool>::default();
+    unsafe {
+      v8__Value__InstanceOf(
+        self,
+        &*scope.get_current_context(),
+        &*object,
+        &mut out,
+      );
+    };
+    out.into()
   }
 
   pub fn number_value<'s>(&self, scope: &mut HandleScope<'s>) -> Option<f64> {
