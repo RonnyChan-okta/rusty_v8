@@ -5,10 +5,10 @@ use crate::data::ObjectTemplate;
 use crate::data::Template;
 use crate::isolate::Isolate;
 use crate::support::int;
+use crate::support::void;
 use crate::support::MapFnTo;
 use crate::AccessorNameGetterCallback;
 use crate::AccessorNameSetterCallback;
-use crate::CFunction;
 use crate::ConstructorBehavior;
 use crate::Context;
 use crate::Function;
@@ -45,7 +45,10 @@ extern "C" {
     length: i32,
     constructor_behavior: ConstructorBehavior,
     side_effect_type: SideEffectType,
-    c_function_or_null: *const CFunction,
+    fast_function_pointer: *const void,
+    fast_function_args_len: usize,
+    fast_function_args: *const CTypeInfo,
+    fast_function_return: CTypeInfo,
   ) -> *const FunctionTemplate;
   fn v8__FunctionTemplate__GetFunction(
     this: *const FunctionTemplate,
@@ -99,6 +102,24 @@ extern "C" {
   );
 }
 
+#[repr(u8)]
+pub enum CTypeInfo {
+  Void,
+  Bool,
+  Int32,
+  Uint32,
+  Int64,
+  Uint64,
+  Float32,
+  Float64,
+  V8Value,
+}
+
+pub trait FastFunctionInfo: 'static {
+  fn signature(&self) -> (&'static [CTypeInfo], CTypeInfo);
+  fn function(&self) -> *const void;
+}
+
 impl Template {
   /// Adds a property to each instance created by this template.
   pub fn set(&self, key: Local<Name>, value: Local<Data>) {
@@ -124,11 +145,17 @@ impl<'s> FunctionBuilder<'s, FunctionTemplate> {
     self
   }
 
+  pub fn fast_function<F: FastFunctionInfo>(mut self, f: F) -> Self {
+    self.fast_function = Some(Box::new(f));
+    self
+  }
+
   /// Creates the function template.
   pub fn build(
     self,
     scope: &mut HandleScope<'s, ()>,
   ) -> Local<'s, FunctionTemplate> {
+    let fast_function = self.fast_function.as_ref();
     unsafe {
       scope.cast_local(|sd| {
         v8__FunctionTemplate__New(
@@ -139,7 +166,10 @@ impl<'s> FunctionBuilder<'s, FunctionTemplate> {
           self.length,
           self.constructor_behavior,
           self.side_effect_type,
-          null(),
+          fast_function.map_or_else(null, |f| f.function()),
+          fast_function.map_or(0, |f| f.signature().0.len()),
+          fast_function.map_or_else(null, |f| f.signature().0.as_ptr()),
+          fast_function.map_or(CTypeInfo::Void, |f| f.signature().1),
         )
       })
     }

@@ -6107,3 +6107,53 @@ fn instance_of() {
 
   assert!(array.instance_of(&mut scope, array_constructor).unwrap());
 }
+
+#[test]
+fn fast_api() {
+  let _setup_guard = setup();
+
+  fn fast_add(a: i32, b: i32) -> i32 {
+    println!("{}", a);
+    a + b
+  }
+
+  fn slow_add(
+    scope: &mut v8::HandleScope,
+    _: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+  ) {
+  }
+
+  struct AddOp;
+  impl v8::FastFunctionInfo for AddOp {
+    fn signature(&self) -> (&'static [v8::CTypeInfo], v8::CTypeInfo) {
+      return (
+        &[v8::CTypeInfo::Int32, v8::CTypeInfo::Int32],
+        v8::CTypeInfo::Int32,
+      );
+    }
+
+    fn function(&self) -> *const c_void {
+      fast_add as *const _
+    }
+  }
+
+  // Setup isolate.
+  let mut isolate = v8::Isolate::new(Default::default());
+  let mut scope = &mut v8::HandleScope::new(&mut isolate);
+  let context = v8::Context::new(scope);
+  let scope = &mut v8::ContextScope::new(scope, context);
+
+  let fast_template = v8::FunctionTemplate::builder(slow_add)
+    .fast_function(AddOp)
+    .build(scope);
+  let func = fast_template.get_function(scope).unwrap();
+  let global = context.global(scope);
+  let key = v8::String::new(scope, "addFast").unwrap();
+  let global = context.global(scope);
+  global.set(scope, key.into(), func.into());
+  let is_nice: v8::Local<v8::Boolean> = eval(scope, "addFast(68, 1) === 69")
+    .unwrap()
+    .try_into()
+    .unwrap();
+}
