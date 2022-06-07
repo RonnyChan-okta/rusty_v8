@@ -3365,15 +3365,6 @@ fn snapshot_creator() {
 
 #[test]
 fn snapshot_creator_multiple_contexts() {
-  fn compile_and_run<'s>(
-    scope: &mut v8::HandleScope<'s>,
-    source: &str,
-  ) -> Option<v8::Local<'s, v8::Value>> {
-    let source = v8::String::new(scope, source).unwrap();
-    let script = v8::Script::compile(scope, source, None).unwrap();
-    script.run(scope)
-  }
-
   let _setup_guard = setup();
   let startup_data = {
     let mut snapshot_creator = v8::SnapshotCreator::new(None, None);
@@ -3382,15 +3373,11 @@ fn snapshot_creator_multiple_contexts() {
       let mut scope = v8::HandleScope::new(&mut isolate);
       let context = v8::Context::new(&mut scope);
       let scope = &mut v8::ContextScope::new(&mut scope, context);
-      compile_and_run(
-        scope,
-        "globalThis.__bootstrap = { defaultContextProp: 1};",
-      )
-      .unwrap();
+      eval(scope, "globalThis.__bootstrap = { defaultContextProp: 1};")
+        .unwrap();
       {
         let value =
-          compile_and_run(scope, "globalThis.__bootstrap.defaultContextProp")
-            .unwrap();
+          eval(scope, "globalThis.__bootstrap.defaultContextProp").unwrap();
         let one_val = v8::Number::new(scope, 1.0).into();
         assert!(value.same_value(one_val));
       }
@@ -3400,12 +3387,9 @@ fn snapshot_creator_multiple_contexts() {
       let scope = &mut v8::HandleScope::new(&mut isolate);
       let context = v8::Context::new(scope);
       let scope = &mut v8::ContextScope::new(scope, context);
-      compile_and_run(scope, "globalThis.__bootstrap = { context0Prop: 2 };")
-        .unwrap();
+      eval(scope, "globalThis.__bootstrap = { context0Prop: 2 };").unwrap();
       {
-        let value =
-          compile_and_run(scope, "globalThis.__bootstrap.context0Prop")
-            .unwrap();
+        let value = eval(scope, "globalThis.__bootstrap.context0Prop").unwrap();
         let two_val = v8::Number::new(scope, 2.0).into();
         assert!(value.same_value(two_val));
       }
@@ -3428,26 +3412,18 @@ fn snapshot_creator_multiple_contexts() {
       let scope = &mut v8::ContextScope::new(scope, context);
       {
         let value =
-          compile_and_run(scope, "globalThis.__bootstrap.defaultContextProp")
-            .unwrap();
+          eval(scope, "globalThis.__bootstrap.defaultContextProp").unwrap();
         let one_val = v8::Number::new(scope, 1.0).into();
         assert!(value.same_value(one_val));
       }
       {
-        let value =
-          compile_and_run(scope, "globalThis.__bootstrap.context0Prop")
-            .unwrap();
+        let value = eval(scope, "globalThis.__bootstrap.context0Prop").unwrap();
         assert!(value.is_undefined());
       }
       {
-        compile_and_run(
-          scope,
-          "globalThis.__bootstrap.defaultContextProp2 = 3;",
-        )
-        .unwrap();
+        eval(scope, "globalThis.__bootstrap.defaultContextProp2 = 3;").unwrap();
         let value =
-          compile_and_run(scope, "globalThis.__bootstrap.defaultContextProp2")
-            .unwrap();
+          eval(scope, "globalThis.__bootstrap.defaultContextProp2").unwrap();
         let three_val = v8::Number::new(scope, 3.0).into();
         assert!(value.same_value(three_val));
       }
@@ -3459,23 +3435,18 @@ fn snapshot_creator_multiple_contexts() {
       let scope = &mut v8::ContextScope::new(scope, context);
       {
         let value =
-          compile_and_run(scope, "globalThis.__bootstrap.defaultContextProp")
-            .unwrap();
+          eval(scope, "globalThis.__bootstrap.defaultContextProp").unwrap();
         assert!(value.is_undefined());
       }
       {
-        let value =
-          compile_and_run(scope, "globalThis.__bootstrap.context0Prop")
-            .unwrap();
+        let value = eval(scope, "globalThis.__bootstrap.context0Prop").unwrap();
         let two_val = v8::Number::new(scope, 2.0).into();
         assert!(value.same_value(two_val));
       }
       {
-        compile_and_run(scope, "globalThis.__bootstrap.context0Prop2 = 4;")
-          .unwrap();
+        eval(scope, "globalThis.__bootstrap.context0Prop2 = 4;").unwrap();
         let value =
-          compile_and_run(scope, "globalThis.__bootstrap.context0Prop2")
-            .unwrap();
+          eval(scope, "globalThis.__bootstrap.context0Prop2").unwrap();
         let four_val = v8::Number::new(scope, 4.0).into();
         assert!(value.same_value(four_val));
       }
@@ -3494,28 +3465,23 @@ fn snapshot_creator_multiple_contexts() {
       let context = v8::Context::new(scope);
       let scope = &mut v8::ContextScope::new(scope, context);
       {
-        let value =
-          compile_and_run(scope, "globalThis.__bootstrap.context0Prop")
-            .unwrap();
+        let value = eval(scope, "globalThis.__bootstrap.context0Prop").unwrap();
         assert!(value.is_undefined());
       }
       {
         let value =
-          compile_and_run(scope, "globalThis.__bootstrap.context0Prop2")
-            .unwrap();
+          eval(scope, "globalThis.__bootstrap.context0Prop2").unwrap();
         assert!(value.is_undefined());
       }
       {
         let value =
-          compile_and_run(scope, "globalThis.__bootstrap.defaultContextProp")
-            .unwrap();
+          eval(scope, "globalThis.__bootstrap.defaultContextProp").unwrap();
         let one_val = v8::Number::new(scope, 1.0).into();
         assert!(value.same_value(one_val));
       }
       {
         let value =
-          compile_and_run(scope, "globalThis.__bootstrap.defaultContextProp2")
-            .unwrap();
+          eval(scope, "globalThis.__bootstrap.defaultContextProp2").unwrap();
         let three_val = v8::Number::new(scope, 3.0).into();
         assert!(value.same_value(three_val));
       }
@@ -3526,27 +3492,22 @@ fn snapshot_creator_multiple_contexts() {
       let scope = &mut v8::ContextScope::new(scope, context);
       {
         let value =
-          compile_and_run(scope, "globalThis.__bootstrap.defaultContextProp")
-            .unwrap();
+          eval(scope, "globalThis.__bootstrap.defaultContextProp").unwrap();
         assert!(value.is_undefined());
       }
       {
         let value =
-          compile_and_run(scope, "globalThis.__bootstrap.defaultContextProp2")
-            .unwrap();
+          eval(scope, "globalThis.__bootstrap.defaultContextProp2").unwrap();
         assert!(value.is_undefined());
       }
       {
-        let value =
-          compile_and_run(scope, "globalThis.__bootstrap.context0Prop")
-            .unwrap();
+        let value = eval(scope, "globalThis.__bootstrap.context0Prop").unwrap();
         let two_val = v8::Number::new(scope, 2.0).into();
         assert!(value.same_value(two_val));
       }
       {
         let value =
-          compile_and_run(scope, "globalThis.__bootstrap.context0Prop2")
-            .unwrap();
+          eval(scope, "globalThis.__bootstrap.context0Prop2").unwrap();
         let four_val = v8::Number::new(scope, 4.0).into();
         assert!(value.same_value(four_val));
       }
