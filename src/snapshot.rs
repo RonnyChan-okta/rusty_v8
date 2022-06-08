@@ -1,8 +1,11 @@
 use crate::external_references::ExternalReferences;
 use crate::scope::data::ScopeData;
 use crate::support::char;
+use std::mem::forget;
 use crate::support::int;
 use crate::support::intptr_t;
+use crate::support::Allocated;
+use crate::support::Allocation;
 use crate::Context;
 use crate::Data;
 use crate::Isolate;
@@ -48,31 +51,32 @@ extern "C" {
   fn v8__StartupData__DESTRUCT(this: *mut StartupData);
 }
 
-// TODO(piscisaureus): merge this struct with
-// `isolate_create_params::raw::StartupData`.
 #[repr(C)]
 #[derive(Debug)]
 pub struct StartupData {
-  data: *const char,
-  raw_size: int,
+  pub data: *const char,
+  pub raw_size: int,
 }
 
-impl From<Box<[u8]>> for StartupData {
-  fn from(slice: Box<[u8]>) -> Self {
-    let mut data: Vec<u8> = vec![];
-    data.copy_from_slice(&slice);
-    StartupData {
-      data: data.as_ptr() as *const char,
-      raw_size: data.len() as int,
-    }
+pub struct StartupDataAllocations {
+  snapshot_blob_data: Allocation<[u8]>,
+  snapshot_blob_header: Allocation<StartupData>,
+}
+
+impl StartupData {
+  pub(crate) fn boxed_header(data: &Allocation<[u8]>) -> Box<Self> {
+    Box::new(Self {
+      data: &data[0] as *const _ as *const char,
+      raw_size: int::try_from(data.len()).unwrap(),
+    })
   }
-}
 
-impl From<&[u8]> for StartupData {
-  fn from(slice: &[u8]) -> Self {
-    StartupData {
-      data: slice.as_ptr() as *const char,
-      raw_size: slice.len() as int,
+  pub fn new(data: impl Allocated<[u8]>) -> StartupDataAllocations {
+    let data = Allocation::of(data);
+    let header = Allocation::of(Self::boxed_header(&data));
+    StartupDataAllocations {
+      snapshot_blob_data: data,
+      snapshot_blob_header: header,
     }
   }
 }
@@ -121,7 +125,7 @@ impl SnapshotCreator {
   /// The isolate is created from scratch.
   pub fn new(
     external_references: Option<&'static ExternalReferences>,
-    existing_blob: Option<&StartupData>,
+    existing_blob: Option<StartupDataAllocations>,
   ) -> Self {
     let mut snapshot_creator: MaybeUninit<Self> = MaybeUninit::uninit();
     let external_references_ptr = if let Some(er) = external_references {
@@ -130,7 +134,10 @@ impl SnapshotCreator {
       std::ptr::null()
     };
     let existing_blob_ptr = if let Some(startup_data) = existing_blob {
-      startup_data
+      let ptr = &*startup_data.snapshot_blob_header as *const StartupData;
+      // TODO(@littledivy): This probably needs to be in external_references
+      forget(startup_data);
+      ptr
     } else {
       std::ptr::null()
     };
@@ -138,7 +145,7 @@ impl SnapshotCreator {
       v8__SnapshotCreator__CONSTRUCT(
         &mut snapshot_creator,
         external_references_ptr,
-        existing_blob_ptr,
+        &*existing_blob_ptr,
       );
       snapshot_creator.assume_init()
     }

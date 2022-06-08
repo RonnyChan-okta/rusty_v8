@@ -7,6 +7,7 @@ use crate::support::Allocated;
 use crate::support::Allocation;
 use crate::support::Opaque;
 use crate::support::SharedPtr;
+use crate::snapshot::StartupData;
 
 use std::any::Any;
 use std::convert::TryFrom;
@@ -42,7 +43,7 @@ impl CreateParams {
   /// Explicitly specify a startup snapshot blob.
   pub fn snapshot_blob(mut self, data: impl Allocated<[u8]>) -> Self {
     let data = Allocation::of(data);
-    let header = Allocation::of(raw::StartupData::boxed_header(&data));
+    let header = Allocation::of(StartupData::boxed_header(&data));
     self.raw.snapshot_blob = &*header;
     self.allocations.snapshot_blob_data = Some(data);
     self.allocations.snapshot_blob_header = Some(header);
@@ -174,7 +175,7 @@ struct CreateParamAllocations {
   // Owns `struct StartupData` which contains just the (ptr, len) tuple in V8's
   // preferred format. We have to heap allocate this because we need to put a
   // stable pointer to it in `CreateParams`.
-  snapshot_blob_header: Option<Allocation<raw::StartupData>>,
+  snapshot_blob_header: Option<Allocation<StartupData>>,
   external_references: Option<Allocation<[intptr_t]>>,
 }
 
@@ -189,6 +190,7 @@ fn create_param_defaults() {
 
 pub(crate) mod raw {
   use super::*;
+  use crate::snapshot::StartupData;
 
   #[repr(C)]
   #[derive(Debug)]
@@ -226,22 +228,6 @@ pub(crate) mod raw {
       let mut buf = MaybeUninit::<Self>::uninit();
       unsafe { v8__Isolate__CreateParams__CONSTRUCT(&mut buf) };
       unsafe { buf.assume_init() }
-    }
-  }
-
-  #[repr(C)]
-  #[derive(Debug)]
-  pub(crate) struct StartupData {
-    pub data: *const char,
-    pub raw_size: int,
-  }
-
-  impl StartupData {
-    pub(super) fn boxed_header(data: &Allocation<[u8]>) -> Box<Self> {
-      Box::new(Self {
-        data: &data[0] as *const _ as *const char,
-        raw_size: int::try_from(data.len()).unwrap(),
-      })
     }
   }
 
