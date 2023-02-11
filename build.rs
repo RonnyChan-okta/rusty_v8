@@ -15,6 +15,14 @@ fn main() {
   println!("cargo:rerun-if-changed=BUILD.gn");
   println!("cargo:rerun-if-changed=src/binding.cc");
 
+  let bindings = bindgen::Builder::default()
+    .header("wee8.h")
+    .generate()
+    .expect("Unable to generate bindings");
+  let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+  bindings
+    .write_to_file("wee8.rs")
+    .expect("Couldn't write bindings!");
   // These are all the environment variables that we check. This is
   // probably more than what is needed, but missing an important
   // variable can lead to broken links when switching rusty_v8

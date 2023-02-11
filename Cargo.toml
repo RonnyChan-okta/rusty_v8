@@ -85,6 +85,7 @@ lazy_static = "1.4.0"
 [build-dependencies]
 fslock = "0.1.8"
 which = "4.2.5"
+bindgen = "0.53.1"
 
 [dev-dependencies]
 align-data = "0.1.0"
